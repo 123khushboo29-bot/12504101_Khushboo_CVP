@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CVP Ledger — Cost-Volume-Profit Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#0F1B2D;
+  --panel:#16263D;
+  --panel-2:#1D3050;
+  --paper:#EDEDE6;
+  --paper-dim:#B9C0C9;
+  --rule:#2C4260;
+  --pos:#2E9E6D;
+  --pos-dim:#1D6B4B;
+  --neg:#C4483A;
+  --neg-dim:#8F332A;
+  --gold:#C9A24B;
+  --gold-dim:#8A6E33;
+  --input-bg:#0C1524;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ink);
+  color:var(--paper);
+  font-family:'IBM Plex Sans', -apple-system, Segoe UI, Arial, sans-serif;
+  min-height:100vh;
+}
+@font-face{
+  font-family:'IBM Plex Sans';
+  src:local('Arial');
+}
+h1,h2,h3{
+  font-family:'Source Serif Pro', Georgia, 'Times New Roman', serif;
+  font-weight:600;
+  margin:0;
+  letter-spacing:0.2px;
+}
+.mono{
+  font-family:'IBM Plex Mono', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+/* ===== HEADER / MASTHEAD ===== */
+.masthead{
+  border-bottom:1px solid var(--rule);
+  padding:26px 32px 18px 32px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  flex-wrap:wrap;
+  gap:16px;
+}
+.masthead .title-block .eyebrow{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:6px;
+}
+.masthead h1{
+  font-size:30px;
+  color:var(--paper);
+}
+.masthead .subtitle{
+  font-size:13px;
+  color:var(--paper-dim);
+  margin-top:4px;
+  font-family:'IBM Plex Mono', monospace;
+}
+.company-input{
+  background:transparent;
+  border:none;
+  border-bottom:1px dashed var(--gold-dim);
+  color:var(--paper);
+  font-family:'Source Serif Pro', Georgia, serif;
+  font-size:30px;
+  font-weight:600;
+  padding:0 2px;
+  width:auto;
+  min-width:120px;
+}
+.company-input:focus{outline:none;border-bottom-color:var(--gold);}
+.subtitle-input{
+  background:transparent;
+  border:none;
+  border-bottom:1px dashed var(--gold-dim);
+  color:var(--paper-dim);
+  font-family:'IBM Plex Mono', monospace;
+  font-size:13px;
+  margin-top:4px;
+  padding:2px 2px;
+  width:260px;
+}
+.subtitle-input:focus{outline:none;border-bottom-color:var(--gold);}
+.ticker-readout{
+  text-align:right;
+}
+.ticker-readout .label{
+  font-size:10px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--paper-dim);
+}
+.ticker-readout .value{
+  font-size:26px;
+  font-weight:600;
+}
+.status-live{color:var(--pos);}
+.status-dead{color:var(--neg);}
+
+/* ===== LAYOUT ===== */
+.wrap{
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:0;
+}
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr;}
+}
+
+/* ===== SIDEBAR (INPUTS) ===== */
+.sidebar{
+  border-right:1px solid var(--rule);
+  padding:24px 22px;
+  background:linear-gradient(180deg, var(--panel), var(--ink) 85%);
+  min-height:100%;
+}
+.sidebar h2{
+  font-size:12px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:4px;
+  font-family:'IBM Plex Mono', monospace;
+  font-weight:500;
+}
+.sidebar .hint{
+  font-size:11px;
+  color:var(--paper-dim);
+  margin-bottom:18px;
+  line-height:1.5;
+}
+.field{
+  margin-bottom:18px;
+  padding:12px 12px 10px 12px;
+  background:var(--input-bg);
+  border:1px solid var(--gold-dim);
+  border-radius:3px;
+}
+.field label{
+  display:block;
+  font-size:11.5px;
+  color:var(--paper-dim);
+  margin-bottom:8px;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.field .numrow{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:3px;
+  padding:8px 10px;
+}
+.field .numrow:focus-within{border-color:var(--gold);}
+.field .numrow span.prefix{
+  color:var(--gold);
+  font-size:14px;
+  font-family:'IBM Plex Mono', monospace;
+  font-weight:600;
+}
+.field input[type=number]{
+  width:100%;
+  background:transparent;
+  border:none;
+  color:var(--paper);
+  font-family:'IBM Plex Mono', monospace;
+  font-size:16px;
+  font-weight:600;
+  padding:2px 4px;
+}
+.field input[type=number]:focus{outline:none;}
+.field input[type=number]::-webkit-inner-spin-button{opacity:0.6;}
+
+.scenario-toggle{
+  display:flex;
+  border:1px solid var(--gold-dim);
+  border-radius:3px;
+  overflow:hidden;
+  margin-bottom:20px;
+}
+.scenario-toggle button{
+  flex:1;
+  background:var(--input-bg);
+  color:var(--paper-dim);
+  border:none;
+  padding:10px 6px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.scenario-toggle button.active{
+  background:var(--gold);
+  color:var(--ink);
+  font-weight:600;
+}
+
+.export-row{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:22px;
+}
+.export-row button{
+  background:transparent;
+  border:1px solid var(--rule);
+  color:var(--paper);
+  padding:10px 10px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11.5px;
+  letter-spacing:0.8px;
+  border-radius:3px;
+  cursor:pointer;
+  text-transform:uppercase;
+}
+.export-row button:hover{
+  border-color:var(--gold);
+  color:var(--gold);
+}
+
+/* ===== MAIN ===== */
+.main{padding:24px 32px 48px 32px;}
+.section-label{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin:26px 0 12px 0;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.section-label::after{
+  content:'';
+  flex:1;
+  height:1px;
+  background:var(--rule);
+}
+.section-label.first{margin-top:0;}
+
+/* KPI GRID */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(190px,1fr));
+  gap:14px;
+}
+.kpi-card{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  padding:14px 16px;
+  border-radius:2px;
+}
+.kpi-card.pos{border-left-color:var(--pos);}
+.kpi-card.neg{border-left-color:var(--neg);}
+.kpi-card .kpi-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--paper-dim);
+  margin-bottom:6px;
+}
+.kpi-card .kpi-value{
+  font-size:22px;
+  font-family:'IBM Plex Mono', monospace;
+  font-weight:600;
+}
+.kpi-card .kpi-sub{
+  font-size:11px;
+  color:var(--paper-dim);
+  margin-top:4px;
+  font-family:'IBM Plex Mono', monospace;
+}
+
+/* CHART */
+.chart-panel{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:18px;
+}
+.chart-legend-note{
+  font-size:11px;
+  color:var(--paper-dim);
+  margin-top:8px;
+  font-family:'IBM Plex Mono', monospace;
+}
+canvas{max-width:100%;}
+
+/* CHART ROW (multi-chart grid) */
+.chart-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+}
+@media (max-width:900px){
+  .chart-row{grid-template-columns:1fr;}
+}
+.chart-row .chart-panel{display:flex; flex-direction:column;}
+.chart-row .chart-panel .canvas-wrap{position:relative; flex:1; min-height:260px;}
+
+/* TABLE */
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+th{
+  text-align:left;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:10.5px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--gold);
+  border-bottom:1px solid var(--rule);
+  padding:8px 10px;
+}
+td{
+  padding:9px 10px;
+  border-bottom:1px solid var(--rule);
+  font-family:'IBM Plex Mono', monospace;
+}
+tr.base-row td{color:var(--gold); font-weight:600; background:rgba(201,162,75,0.06);}
+td.pos{color:var(--pos);}
+td.neg{color:var(--neg);}
+.table-panel{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:6px 12px 16px 12px;
+  overflow-x:auto;
+}
+
+footer{
+  text-align:center;
+  font-size:10.5px;
+  color:var(--paper-dim);
+  font-family:'IBM Plex Mono', monospace;
+  padding:26px 0 10px 0;
+  letter-spacing:0.5px;
+}
+
+@media print{
+  .sidebar .export-row{display:none;}
+  body{background:white;color:black;}
+}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="title-block">
+    <div class="eyebrow">Cost · Volume · Profit</div>
+    <h1><input class="company-input" id="companyName" value="NextGen Stationery Co."></h1>
+    <input class="subtitle-input" id="productSubtitle" value="Product: Notebook">
+  </div>
+  <div class="ticker-readout">
+    <div class="label">Status at Expected Volume</div>
+    <div class="value mono" id="statusReadout">—</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- SIDEBAR: INPUTS -->
+  <div class="sidebar">
+    <h2>Input Ledger</h2>
+    <div class="hint">Type any value directly into a field — the model recalculates instantly.</div>
+
+    <div class="field">
+      <label>Selling Price / Unit</label>
+      <div class="numrow"><span class="prefix">₹</span><input type="number" id="n_price" value="3.50" step="0.10"></div>
+    </div>
+
+    <div class="field">
+      <label>Variable Cost / Unit</label>
+      <div class="numrow"><span class="prefix">₹</span><input type="number" id="n_vc" value="1.20" step="0.10"></div>
+    </div>
+
+    <div class="field">
+      <label>Fixed Costs (Total)</label>
+      <div class="numrow"><span class="prefix">₹</span><input type="number" id="n_fc" value="15000" step="500"></div>
+    </div>
+
+    <div class="field">
+      <label>Expected Sales Volume</label>
+      <div class="numrow"><span class="prefix">u</span><input type="number" id="n_vol" value="20000" step="100"></div>
+    </div>
+
+    <div class="field">
+      <label>Tax Rate</label>
+      <div class="numrow"><span class="prefix">%</span><input type="number" id="n_tax" value="21" step="1"></div>
+    </div>
+
+    <div class="field">
+      <label>Target Profit (After-Tax)</label>
+      <div class="numrow"><span class="prefix">₹</span><input type="number" id="n_target" value="8000" step="500"></div>
+    </div>
+
+    <div class="field">
+      <label>Max Units — Chart Range</label>
+      <div class="numrow"><span class="prefix">u</span><input type="number" id="n_max" value="60000" step="1000"></div>
+    </div>
+
+    <h2 style="margin-top:26px;">Scenario</h2>
+    <div class="scenario-toggle">
+      <button id="btnBase" class="active">Base Case</button>
+      <button id="btnSens">Sensitivity</button>
+    </div>
+
+    <h2>Export</h2>
+    <div class="export-row">
+      <button id="exportCsv">Download Tables (.csv)</button>
+      <button id="exportPrint">Export / Print View</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <div class="section-label first">Contribution Margin</div>
+    <div class="kpi-grid" id="cmGrid"></div>
+
+    <div class="section-label">Break-Even Analysis</div>
+    <div class="kpi-grid" id="beGrid"></div>
+
+    <div class="section-label">Margin of Safety</div>
+    <div class="kpi-grid" id="mosGrid"></div>
+
+    <div class="section-label">Target Profit</div>
+    <div class="kpi-grid" id="tpGrid"></div>
+
+    <div class="section-label">CVP Chart — Revenue vs. Total Cost</div>
+    <div class="chart-panel">
+      <canvas id="cvpChart" height="110"></canvas>
+      <div class="chart-legend-note" id="chartNote"></div>
+    </div>
+
+    <div class="section-label">Profit / Loss vs. Volume</div>
+    <div class="chart-panel">
+      <canvas id="profitChart" height="90"></canvas>
+      <div class="chart-legend-note" id="profitNote"></div>
+    </div>
+
+    <div class="section-label">Cost Structure &amp; Margin of Safety</div>
+    <div class="chart-row">
+      <div class="chart-panel">
+        <div class="canvas-wrap"><canvas id="costDoughnut"></canvas></div>
+        <div class="chart-legend-note" id="doughnutNote"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="canvas-wrap"><canvas id="mosBar"></canvas></div>
+        <div class="chart-legend-note" id="mosBarNote"></div>
+      </div>
+    </div>
+
+    <div class="section-label" id="sensLabel">Sensitivity Analysis — ±10% Price &amp; Variable Cost</div>
+    <div class="chart-panel" style="margin-bottom:18px;">
+      <canvas id="sensChart" height="90"></canvas>
+      <div class="chart-legend-note" id="sensChartNote"></div>
+    </div>
+    <div class="table-panel">
+      <table id="sensTable">
+        <thead>
+          <tr><th>Scenario</th><th>Price / Unit</th><th>Variable Cost / Unit</th><th>Contribution Margin</th><th>Break-Even (units)</th><th>Break-Even (₹)</th><th>Δ vs. Base (units)</th></tr>
+        </thead>
+        <tbody id="sensBody"></tbody>
+      </table>
+    </div>
+
+    <footer>CVP Ledger — model updates live as inputs change · figures are illustrative, not accounting advice</footer>
+  </div>
+</div>
+
+<script>
+const fmt$ = n => '₹' + Math.round(n).toLocaleString('en-IN');
+const fmt$2 = n => '₹' + n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN = n => Math.round(n).toLocaleString('en-US');
+const fmtPct = n => (n*100).toFixed(1) + '%';
+
+const ids = ['price','vc','fc','vol','tax','target','max'];
+const nums = {};
+ids.forEach(id=>{
+  nums[id]=document.getElementById('n_'+id);
+});
+
+function getInputs(){
+  return {
+    price: parseFloat(nums.price.value)||0,
+    vc: parseFloat(nums.vc.value)||0,
+    fc: parseFloat(nums.fc.value)||0,
+    vol: parseFloat(nums.vol.value)||0,
+    tax: (parseFloat(nums.tax.value)||0)/100,
+    target: parseFloat(nums.target.value)||0,
+    max: parseFloat(nums.max.value)||1000
+  };
+}
+
+function calc(price, vc, fc, vol, tax, target){
+  const cm = price - vc;
+  const cmRatio = price>0 ? cm/price : 0;
+  const beUnits = cm>0 ? fc/cm : Infinity;
+  const beValue = beUnits*price;
+  const mosUnits = vol - beUnits;
+  const mosValue = mosUnits*price;
+  const mosPct = vol>0 ? mosUnits/vol : 0;
+  // Target profit is after-tax. Pre-tax required profit = target / (1-tax)
+  const preTaxNeeded = tax<1 ? target/(1-tax) : target;
+  const targetUnits = cm>0 ? (fc+preTaxNeeded)/cm : Infinity;
+  const currentProfitPreTax = cm*vol - fc;
+  const currentProfitAfterTax = currentProfitPreTax*(1-tax);
+  return {cm,cmRatio,beUnits,beValue,mosUnits,mosValue,mosPct,targetUnits,currentProfitPreTax,currentProfitAfterTax};
+}
+
+let chart, profitChart, costDoughnut, mosBar, sensChartInstance;
+let currentScenario = 'base';
+
+const CHART_COLORS = {
+  gold:'#C9A24B', neg:'#C4483A', pos:'#2E9E6D', slate:'#5A6C86',
+  paper:'#EDEDE6', paperDim:'#B9C0C9', rule:'#2C4260', panel2:'#1D3050'
+};
+
+function kpiCard(label, value, sub, cls){
+  return `<div class="kpi-card ${cls||''}"><div class="kpi-label">${label}</div><div class="kpi-value mono">${value}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+
+function baseScales(xTitle, yTitle, yTickCb){
+  return {
+    x:{ title:{display:!!xTitle, text:xTitle, color:CHART_COLORS.paperDim}, ticks:{color:CHART_COLORS.paperDim, maxTicksLimit:10, font:{family:'IBM Plex Mono', size:10}}, grid:{color:CHART_COLORS.rule} },
+    y:{ title:{display:!!yTitle, text:yTitle, color:CHART_COLORS.paperDim}, ticks:{color:CHART_COLORS.paperDim, font:{family:'IBM Plex Mono', size:10}, callback:yTickCb||(v=>v)}, grid:{color:CHART_COLORS.rule} }
+  };
+}
+
+function render(){
+  const inp = getInputs();
+
+  const r = calc(inp.price, inp.vc, inp.fc, inp.vol, inp.tax, inp.target);
+  const above = inp.vol >= r.beUnits;
+
+  // status readout
+  const statusEl = document.getElementById('statusReadout');
+  statusEl.textContent = above ? 'Above Break-Even' : 'Below Break-Even';
+  statusEl.className = 'value mono ' + (above?'status-live':'status-dead');
+
+  // CM grid
+  document.getElementById('cmGrid').innerHTML =
+    kpiCard('Contribution Margin / Unit', fmt$2(r.cm), `Price ${fmt$2(inp.price)} − VC ${fmt$2(inp.vc)}`) +
+    kpiCard('Contribution Margin Ratio', fmtPct(r.cmRatio), 'CM ÷ Selling Price');
+
+  // BE grid
+  document.getElementById('beGrid').innerHTML =
+    kpiCard('Break-Even Point (Units)', r.cm>0?fmtN(r.beUnits):'n/a', 'Fixed Costs ÷ CM/unit') +
+    kpiCard('Break-Even Point (Sales ₹)', r.cm>0?fmt$(r.beValue):'n/a', 'BE units × Price');
+
+  // MOS grid
+  const mosCls = r.mosUnits>=0 ? 'pos':'neg';
+  document.getElementById('mosGrid').innerHTML =
+    kpiCard('Margin of Safety (Units)', fmtN(r.mosUnits), 'Expected vol. − BE units', mosCls) +
+    kpiCard('Margin of Safety (₹)', fmt$(r.mosValue), '', mosCls) +
+    kpiCard('Margin of Safety (%)', fmtPct(r.mosPct), 'of expected volume', mosCls);
+
+  // Target profit grid
+  document.getElementById('tpGrid').innerHTML =
+    kpiCard('Units for Target Profit', r.cm>0?fmtN(r.targetUnits):'n/a', `After-tax target ${fmt$(inp.target)} @ ${Math.round(inp.tax*100)}% tax`) +
+    kpiCard('Profit at Expected Volume (After-Tax)', fmt$(r.currentProfitAfterTax), `Pre-tax: ${fmt$(r.currentProfitPreTax)}`, r.currentProfitAfterTax>=0?'pos':'neg');
+
+  // ===== Chart 1: CVP (Revenue vs Total Cost) =====
+  const steps = 40;
+  const stepSize = inp.max/steps;
+  const labels=[], revenue=[], totalCost=[], fixedCost=[], profitSeries=[];
+  for(let i=0;i<=steps;i++){
+    const u = i*stepSize;
+    labels.push(fmtN(u));
+    revenue.push(u*inp.price);
+    totalCost.push(inp.fc + u*inp.vc);
+    fixedCost.push(inp.fc);
+    profitSeries.push(u*inp.price - (inp.fc + u*inp.vc));
+  }
+
+  const ctx = document.getElementById('cvpChart').getContext('2d');
+  if(chart) chart.destroy();
+  chart = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels: labels.map(l=>l),
+      datasets:[
+        {label:'Total Revenue', data: revenue, borderColor:CHART_COLORS.gold, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0},
+        {label:'Total Cost', data: totalCost, borderColor:CHART_COLORS.neg, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0},
+        {label:'Fixed Cost', data: fixedCost, borderColor:CHART_COLORS.slate, backgroundColor:'transparent', borderWidth:1, borderDash:[4,4], pointRadius:0, tension:0},
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{labels:{color:CHART_COLORS.paper, font:{family:'IBM Plex Mono', size:11}}},
+        tooltip:{
+          callbacks:{
+            title: (items)=> 'Units: ' + items[0].label,
+            label: (item)=> item.dataset.label+': '+fmt$(item.parsed.y)
+          }
+        }
+      },
+      scales: baseScales('Units Sold', 'Rupees (₹)', v=>'₹'+v.toLocaleString('en-IN'))
+    }
+  });
+
+  document.getElementById('chartNote').textContent = r.cm>0
+    ? `Break-even marked at ${fmtN(r.beUnits)} units (${fmt$(r.beValue)} in sales), where revenue and total cost intersect.`
+    : `Contribution margin is zero or negative — this product cannot break even at the current price/cost inputs.`;
+
+  // ===== Chart 2: Profit / Loss vs Volume =====
+  const profitCtx = document.getElementById('profitChart').getContext('2d');
+  if(profitChart) profitChart.destroy();
+  profitChart = new Chart(profitCtx,{
+    type:'line',
+    data:{
+      labels: labels.map(l=>l),
+      datasets:[
+        {
+          label:'Pre-Tax Profit / Loss',
+          data: profitSeries,
+          borderColor: CHART_COLORS.pos,
+          backgroundColor: 'rgba(46,158,109,0.12)',
+          borderWidth:2,
+          pointRadius:0,
+          fill:true,
+          tension:0,
+          segment:{
+            borderColor: ctx2 => (ctx2.p0.parsed.y<0 || ctx2.p1.parsed.y<0) ? CHART_COLORS.neg : CHART_COLORS.pos
+          }
+        },
+        {
+          label:'Zero Line',
+          data: labels.map(()=>0),
+          borderColor: CHART_COLORS.paperDim,
+          borderWidth:1,
+          borderDash:[3,3],
+          pointRadius:0,
+          fill:false
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{labels:{color:CHART_COLORS.paper, font:{family:'IBM Plex Mono', size:11}}},
+        tooltip:{
+          callbacks:{
+            title: (items)=> 'Units: ' + items[0].label,
+            label: (item)=> item.dataset.label+': '+fmt$(item.parsed.y)
+          }
+        }
+      },
+      scales: baseScales('Units Sold', 'Profit / Loss (₹)', v=>'₹'+v.toLocaleString('en-IN'))
+    }
+  });
+  document.getElementById('profitNote').textContent = r.cm>0
+    ? `Line crosses zero at the break-even point (${fmtN(r.beUnits)} units). Green = profit, red = loss.`
+    : `Profit never turns positive at any volume with the current price/cost inputs.`;
+
+  // ===== Chart 3: Cost Structure Doughnut (at expected volume) =====
+  const totalVarCost = inp.vc*inp.vol;
+  const preTaxProfit = r.currentProfitPreTax;
+  const doughnutLabels = ['Variable Costs','Fixed Costs'];
+  const doughnutData = [Math.max(totalVarCost,0), Math.max(inp.fc,0)];
+  const doughnutColors = [CHART_COLORS.neg, CHART_COLORS.slate];
+  if(preTaxProfit>=0){
+    doughnutLabels.push('Pre-Tax Profit');
+    doughnutData.push(preTaxProfit);
+    doughnutColors.push(CHART_COLORS.pos);
+  } else {
+    doughnutLabels.push('Uncovered Loss');
+    doughnutData.push(Math.abs(preTaxProfit));
+    doughnutColors.push('#8F332A');
+  }
+
+  const doughnutCtx = document.getElementById('costDoughnut').getContext('2d');
+  if(costDoughnut) costDoughnut.destroy();
+  costDoughnut = new Chart(doughnutCtx,{
+    type:'doughnut',
+    data:{
+      labels: doughnutLabels,
+      datasets:[{
+        data: doughnutData,
+        backgroundColor: doughnutColors,
+        borderColor: CHART_COLORS.ink || '#0F1B2D',
+        borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom', labels:{color:CHART_COLORS.paper, font:{family:'IBM Plex Mono', size:11}}},
+        tooltip:{ callbacks:{ label:(item)=> item.label+': '+fmt$(item.parsed) } }
+      },
+      cutout:'62%'
+    }
+  });
+  document.getElementById('doughnutNote').textContent = `Revenue of ${fmt$(inp.price*inp.vol)} at ${fmtN(inp.vol)} units splits into variable cost, fixed cost, and ${preTaxProfit>=0?'profit':'the shortfall still to cover'}.`;
+
+  // ===== Chart 4: Margin of Safety Bar (BE vs Expected vs Target) =====
+  const mosBarCtx = document.getElementById('mosBar').getContext('2d');
+  if(mosBar) mosBar.destroy();
+  const barLabels = ['Break-Even','Expected Volume','Target-Profit Volume'];
+  const barValues = [r.cm>0?r.beUnits:0, inp.vol, r.cm>0?r.targetUnits:0];
+  const barColors = [CHART_COLORS.neg, (above?CHART_COLORS.pos:CHART_COLORS.neg), CHART_COLORS.gold];
+  mosBar = new Chart(mosBarCtx,{
+    type:'bar',
+    data:{
+      labels: barLabels,
+      datasets:[{
+        label:'Units',
+        data: barValues,
+        backgroundColor: barColors,
+        borderRadius:3,
+        barPercentage:0.55
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{ label:(item)=> fmtN(item.parsed.x)+' units' } }
+      },
+      scales:{
+        x:{ ticks:{color:CHART_COLORS.paperDim, font:{family:'IBM Plex Mono', size:10}, callback:v=>fmtN(v)}, grid:{color:CHART_COLORS.rule} },
+        y:{ ticks:{color:CHART_COLORS.paper, font:{family:'IBM Plex Mono', size:11}}, grid:{display:false} }
+      }
+    }
+  });
+  document.getElementById('mosBarNote').textContent = `Margin of safety is the gap between the red (break-even) and gold/green bars — ${fmtN(Math.abs(r.mosUnits))} units ${r.mosUnits>=0?'above':'below'} break-even.`;
+
+  // ===== Sensitivity table + Chart 5: Sensitivity Bar =====
+  const rows = [];
+  const base = calc(inp.price, inp.vc, inp.fc, inp.vol, inp.tax, inp.target);
+  function row(label, p, v, isBase){
+    const rr = calc(p, v, inp.fc, inp.vol, inp.tax, inp.target);
+    const deltaUnits = rr.cm>0 && base.cm>0 ? rr.beUnits - base.beUnits : null;
+    rows.push({label, p, v, cm:rr.cm, beUnits:rr.beUnits, beValue:rr.beValue, delta:deltaUnits, isBase});
+  }
+  row('Base Case', inp.price, inp.vc, true);
+  row('Price +10%', inp.price*1.1, inp.vc);
+  row('Price −10%', inp.price*0.9, inp.vc);
+  row('Variable Cost +10%', inp.price, inp.vc*1.1);
+  row('Variable Cost −10%', inp.price, inp.vc*0.9);
+
+  document.getElementById('sensBody').innerHTML = rows.map(rw=>{
+    const deltaCell = rw.delta===null ? '—' : (rw.delta>0?'+':'') + fmtN(rw.delta);
+    const deltaCls = rw.delta===null ? '' : (rw.delta>0?'neg':(rw.delta<0?'pos':''));
+    return `<tr class="${rw.isBase?'base-row':''}">
+      <td>${rw.label}</td>
+      <td>${fmt$2(rw.p)}</td>
+      <td>${fmt$2(rw.v)}</td>
+      <td>${fmt$2(rw.cm)}</td>
+      <td>${rw.cm>0?fmtN(rw.beUnits):'n/a'}</td>
+      <td>${rw.cm>0?fmt$(rw.beValue):'n/a'}</td>
+      <td class="${deltaCls}">${deltaCell}</td>
+    </tr>`;
+  }).join('');
+
+  const sensLabels = rows.filter(r=>!r.isBase).map(r=>r.label);
+  const sensValues = rows.filter(r=>!r.isBase).map(r=> r.cm>0?r.beUnits:0);
+  const sensColors = rows.filter(r=>!r.isBase).map(r=> r.label.startsWith('Price') ? CHART_COLORS.gold : CHART_COLORS.neg);
+
+  const sensCtx = document.getElementById('sensChart').getContext('2d');
+  if(sensChartInstance) sensChartInstance.destroy();
+  sensChartInstance = new Chart(sensCtx,{
+    type:'bar',
+    data:{
+      labels: sensLabels,
+      datasets:[{
+        label:'Break-Even Units',
+        data: sensValues,
+        backgroundColor: sensColors,
+        borderRadius:3,
+        barPercentage:0.6
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{ callbacks:{ label:(item)=> fmtN(item.parsed.y)+' units to break even' } },
+        annotation: undefined
+      },
+      scales: baseScales('Scenario', 'Break-Even (units)', v=>fmtN(v))
+    }
+  });
+  document.getElementById('sensChartNote').textContent = `Base-case break-even is ${base.cm>0?fmtN(base.beUnits):'n/a'} units. Gold bars = price moves, red bars = variable-cost moves; taller bars mean more units are needed to break even.`;
+
+  window._latestCalc = {inp, r, rows};
+}
+
+ids.forEach(id=>{
+  nums[id].addEventListener('input', render);
+});
+
+document.getElementById('btnBase').addEventListener('click', ()=>{
+  currentScenario='base';
+  document.getElementById('btnBase').classList.add('active');
+  document.getElementById('btnSens').classList.remove('active');
+  document.querySelector('.chart-panel').style.display='block';
+  document.getElementById('sensLabel').parentElement && null;
+  document.getElementById('sensLabel').style.opacity=1;
+});
+document.getElementById('btnSens').addEventListener('click', ()=>{
+  currentScenario='sens';
+  document.getElementById('btnSens').classList.add('active');
+  document.getElementById('btnBase').classList.remove('active');
+  document.getElementById('sensLabel').scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+document.getElementById('exportPrint').addEventListener('click', ()=> window.print());
+
+document.getElementById('exportCsv').addEventListener('click', ()=>{
+  const {inp, r, rows} = window._latestCalc;
+  let csv = 'CVP Model Export\n\n';
+  csv += 'Input,Value\n';
+  csv += `Selling Price per Unit,${inp.price}\n`;
+  csv += `Variable Cost per Unit,${inp.vc}\n`;
+  csv += `Fixed Costs (Total),${inp.fc}\n`;
+  csv += `Expected Sales Volume,${inp.vol}\n`;
+  csv += `Tax Rate,${inp.tax}\n`;
+  csv += `Target Profit (After-Tax),${inp.target}\n`;
+  csv += `Max Units (Chart Range),${inp.max}\n\n`;
+  csv += 'Output,Value\n';
+  csv += `Contribution Margin per Unit,${r.cm.toFixed(2)}\n`;
+  csv += `Contribution Margin Ratio,${(r.cmRatio*100).toFixed(2)}%\n`;
+  csv += `Break-Even Units,${r.cm>0?Math.round(r.beUnits):'n/a'}\n`;
+  csv += `Break-Even Sales Value,${r.cm>0?r.beValue.toFixed(2):'n/a'}\n`;
+  csv += `Margin of Safety Units,${r.mosUnits.toFixed(0)}\n`;
+  csv += `Margin of Safety Value,${r.mosValue.toFixed(2)}\n`;
+  csv += `Margin of Safety %,${(r.mosPct*100).toFixed(2)}%\n`;
+  csv += `Units for Target Profit,${r.cm>0?Math.round(r.targetUnits):'n/a'}\n\n`;
+  csv += 'Sensitivity Analysis\n';
+  csv += 'Scenario,Price,Variable Cost,Contribution Margin,Break-Even Units,Break-Even Value,Delta vs Base Units\n';
+  rows.forEach(rw=>{
+    csv += `${rw.label},${rw.p.toFixed(2)},${rw.v.toFixed(2)},${rw.cm.toFixed(2)},${rw.cm>0?Math.round(rw.beUnits):'n/a'},${rw.cm>0?rw.beValue.toFixed(2):'n/a'},${rw.delta===null?'n/a':rw.delta.toFixed(0)}\n`;
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='cvp_model_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+render();
+</script>
+</body>
+</html>
